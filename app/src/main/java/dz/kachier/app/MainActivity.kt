@@ -6,6 +6,8 @@ import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -137,6 +139,8 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
  val isStock=profile==Profile.STOCK
  var stockSection by remember { mutableStateOf("الرئيسية") }
  var searchText by remember { mutableStateOf("") }
+ val productCategories = listOf("سجائر وتبغ","شوكولا وحلويات","علكة وبونبون","مشروبات ومياه","شيبس ومقرمشات","بسكويت وكيك","قهوة وشاي","مواد غذائية","مواد تنظيف","نظافة شخصية","لوازم الهاتف","بطاريات وولاعات","مثلجات","متنوعة")
+ var selectedCategory by remember { mutableStateOf("الكل") }
  fun refresh(){scope.launch{products=load();today=daily();todayProfit=profit()}}
  LaunchedEffect(Unit){refresh()}
  val total=cart.entries.sumOf{(p,n)->p.sellPrice*n}
@@ -176,7 +180,16 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
       }
       Text("الربح المتوقع من المخزون: "+da(products.sumOf{(it.sellPrice-it.buyPrice)*it.stock}),style=MaterialTheme.typography.bodyMedium)
      }
-     "المنتجات" -> OutlinedTextField(searchText,{searchText=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("ابحث عن سلعة")})
+     "المنتجات" -> Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+      OutlinedTextField(searchText,{searchText=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("ابحث عن سلعة")})
+      Text("اختر الصنف لعرض سلعه فقط",style=MaterialTheme.typography.labelMedium)
+      Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+       (listOf("الكل") + productCategories).forEach { c ->
+        val count=if(c=="الكل") products.size else products.count{it.category==c}
+        FilterChip(selected=selectedCategory==c,onClick={selectedCategory=c},label={Text("$c ($count)")})
+       }
+      }
+     }
      "التنبيهات" -> {
       val low=products.filter{it.stock<=it.minStock}
       Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.errorContainer)){Column(Modifier.padding(12.dp)){Text("السلع الناقصة",fontWeight=FontWeight.Bold);Text("يُحسب التنبيه حسب الحد الأدنى المحدد لكل سلعة")}}
@@ -194,7 +207,7 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
     Column(Modifier.padding(16.dp)){Text("مبيعات اليوم");Text(da(today),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)}
    }
    if(!isStock || stockSection=="الرئيسية" || stockSection=="المنتجات") Row(Modifier.fillMaxWidth().padding(vertical=12.dp),horizontalArrangement=Arrangement.SpaceBetween){Text(if(isStock)"المنتجات والمخزون" else "السلع للبيع",style=MaterialTheme.typography.titleLarge);Text(products.size.toString()+" منتج")}
-   val shownProducts=if(isStock && stockSection=="التنبيهات") emptyList() else if(isStock && stockSection=="التقارير") emptyList() else if(isStock && stockSection=="المنتجات" && searchText.isNotBlank()) products.filter{it.name.contains(searchText.trim(),ignoreCase=true) || it.category.contains(searchText.trim(),ignoreCase=true) || (it.barcode?.contains(searchText.trim())==true)} else products
+   val shownProducts=if(isStock && stockSection=="التنبيهات") emptyList() else if(isStock && stockSection=="التقارير") emptyList() else if(isStock && stockSection=="المنتجات") products.filter{(selectedCategory=="الكل" || it.category==selectedCategory) && (searchText.isBlank() || it.name.contains(searchText.trim(),ignoreCase=true) || it.category.contains(searchText.trim(),ignoreCase=true) || (it.barcode?.contains(searchText.trim())==true))} else products
    if(shownProducts.isEmpty() && (stockSection=="الرئيسية" || stockSection=="المنتجات" || !isStock)) Box(Modifier.weight(1f).fillMaxWidth(),contentAlignment=Alignment.Center){Text(if(isStock)"لا توجد سلع مطابقة. أضف سلعة من الأعلى." else "لا توجد سلع بعد. اطلب من مسؤول الستوك إضافتها.")}
    else if(shownProducts.isNotEmpty()) LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)){items(shownProducts,key={it.id}){p->
     Card(Modifier.fillMaxWidth().then(if(!isStock)Modifier.clickable{val n=cart[p]?:0;if(p.stock>n)cart=cart+(p to n+1)else alert="المخزون غير كافٍ"}else Modifier.clickable{editing=p;name=p.name;buy=p.buyPrice.toString();price=p.sellPrice.toString();qty=p.stock.toString();category=p.category;barcode=p.barcode.orEmpty();minStock=p.minStock.toString();addOpen=true})){
