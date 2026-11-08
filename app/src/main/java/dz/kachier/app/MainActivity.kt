@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -30,6 +31,23 @@ import javax.crypto.spec.PBEKeySpec
 
 private enum class Profile { SELLER, STOCK }
 
+private fun categoryColor(category: String): Color = when (category) {
+ "سجائر وتبغ" -> Color(0xFFE9E0D5)
+ "شوكولا وحلويات" -> Color(0xFFF2E1D7)
+ "علكة وبونبون" -> Color(0xFFF5E4ED)
+ "مشروبات ومياه" -> Color(0xFFDCECF3)
+ "شيبس ومقرمشات" -> Color(0xFFF4E9CF)
+ "بسكويت وكيك" -> Color(0xFFF0E5D1)
+ "قهوة وشاي" -> Color(0xFFE7DED0)
+ "مواد غذائية" -> Color(0xFFE3EBD8)
+ "مواد تنظيف" -> Color(0xFFDCEBE9)
+ "نظافة شخصية" -> Color(0xFFE5E3F0)
+ "لوازم الهاتف" -> Color(0xFFDDE5F2)
+ "بطاريات وولاعات" -> Color(0xFFF3E2CF)
+ "مثلجات" -> Color(0xFFDCEEF0)
+ else -> Color(0xFFE9E9E3)
+}
+
 class MainActivity : ComponentActivity() {
  private val db by lazy { ShopDatabase.get(this) }
  private val dao by lazy { db.dao() }
@@ -37,7 +55,18 @@ class MainActivity : ComponentActivity() {
  override fun onCreate(savedInstanceState: Bundle?) {
   super.onCreate(savedInstanceState)
   setContent {
-   MaterialTheme(colorScheme = lightColorScheme(primary = androidx.compose.ui.graphics.Color(0xFF176B55))) {
+   MaterialTheme(colorScheme = lightColorScheme(
+     primary = Color(0xFF174B3A), onPrimary = Color.White,
+     primaryContainer = Color(0xFFE0EEE6), onPrimaryContainer = Color(0xFF123629),
+     secondary = Color(0xFFB58A3A), onSecondary = Color.White,
+     secondaryContainer = Color(0xFFF4EBD8), onSecondaryContainer = Color(0xFF59431B),
+     tertiary = Color(0xFF52647A), onTertiary = Color.White,
+     tertiaryContainer = Color(0xFFE6EBF1), onTertiaryContainer = Color(0xFF26384D),
+     background = Color(0xFFF6F4EF), onBackground = Color(0xFF242820),
+     surface = Color(0xFFFFFEFA), onSurface = Color(0xFF242820),
+     surfaceVariant = Color(0xFFECE9E1), onSurfaceVariant = Color(0xFF5D625A),
+     error = Color(0xFFB64040), errorContainer = Color(0xFFF8E4E1)
+    )) {
     var profile by remember { mutableStateOf<Profile?>(null) }
     var configured by remember { mutableStateOf(prefs.contains("seller_hash") && prefs.contains("stock_hash")) }
     if (!configured) PasswordSetup { seller, stock ->
@@ -165,11 +194,11 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
       Text("لوحة قيادة الستوك",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
       Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
        Card(Modifier.weight(1f),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Column(Modifier.padding(12.dp)){Text("قيمة الشراء",style=MaterialTheme.typography.labelMedium);Text(da(products.sumOf{it.buyPrice*it.stock}),fontWeight=FontWeight.Bold);Text("المخزون الحالي",style=MaterialTheme.typography.labelSmall)}}
-       Card(Modifier.weight(1f)){Column(Modifier.padding(12.dp)){Text("قيمة البيع المتوقعة",style=MaterialTheme.typography.labelMedium);Text(da(products.sumOf{it.sellPrice*it.stock}),fontWeight=FontWeight.Bold);Text("ليست ربحاً محققاً",style=MaterialTheme.typography.labelSmall)}}
+       Card(Modifier.weight(1f),colors=CardDefaults.cardColors(containerColor=Color(0xFFF4EBD8))){Column(Modifier.padding(12.dp)){Text("قيمة البيع المتوقعة",style=MaterialTheme.typography.labelMedium);Text(da(products.sumOf{it.sellPrice*it.stock}),fontWeight=FontWeight.Bold);Text("ليست ربحاً محققاً",style=MaterialTheme.typography.labelSmall)}}
       }
       Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-       Card(Modifier.weight(1f)){Column(Modifier.padding(12.dp)){Text("ربح اليوم",style=MaterialTheme.typography.labelMedium);Text(da(todayProfit),fontWeight=FontWeight.Bold);Text("محقق من المبيعات",style=MaterialTheme.typography.labelSmall)}}
-       Card(Modifier.weight(1f)){Column(Modifier.padding(12.dp)){Text("مبيعات اليوم",style=MaterialTheme.typography.labelMedium);Text(da(today),fontWeight=FontWeight.Bold);Text(products.size.toString()+" صنف",style=MaterialTheme.typography.labelSmall)}}
+       Card(Modifier.weight(1f),colors=CardDefaults.cardColors(containerColor=Color(0xFFE2EEE5))){Column(Modifier.padding(12.dp)){Text("ربح اليوم",style=MaterialTheme.typography.labelMedium);Text(da(todayProfit),fontWeight=FontWeight.Bold);Text("محقق من المبيعات",style=MaterialTheme.typography.labelSmall)}}
+       Card(Modifier.weight(1f),colors=CardDefaults.cardColors(containerColor=Color(0xFFE5EAF0))){Column(Modifier.padding(12.dp)){Text("مبيعات اليوم",style=MaterialTheme.typography.labelMedium);Text(da(today),fontWeight=FontWeight.Bold);Text(products.size.toString()+" صنف",style=MaterialTheme.typography.labelSmall)}}
       }
       val lowCount=products.count{it.stock<=it.minStock}
       Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=if(lowCount>0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer)){
@@ -186,7 +215,10 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
       Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
        (listOf("الكل") + productCategories).forEach { c ->
         val count=if(c=="الكل") products.size else products.count{it.category==c}
-        FilterChip(selected=selectedCategory==c,onClick={selectedCategory=c},label={Text("$c ($count)")})
+        FilterChip(selected=selectedCategory==c,onClick={selectedCategory=c},colors=FilterChipDefaults.filterChipColors(
+         selectedContainerColor=if(c=="الكل") MaterialTheme.colorScheme.primary else categoryColor(c),
+         selectedLabelColor=if(c=="الكل") Color.White else Color(0xFF293128),
+         containerColor=MaterialTheme.colorScheme.surface),label={Text("$c ($count)")})
        }
       }
      }
@@ -212,7 +244,7 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
    else if(shownProducts.isNotEmpty()) LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)){items(shownProducts,key={it.id}){p->
     Card(Modifier.fillMaxWidth().then(if(!isStock)Modifier.clickable{val n=cart[p]?:0;if(p.stock>n)cart=cart+(p to n+1)else alert="المخزون غير كافٍ"}else Modifier.clickable{editing=p;name=p.name;buy=p.buyPrice.toString();price=p.sellPrice.toString();qty=p.stock.toString();category=p.category;barcode=p.barcode.orEmpty();minStock=p.minStock.toString();addOpen=true})){
      Row(Modifier.fillMaxWidth().padding(14.dp),verticalAlignment=Alignment.CenterVertically){
-      Column(Modifier.weight(1f)){Text(p.name,fontWeight=FontWeight.SemiBold);Text(p.category+" • المخزون: "+p.stock);if(isStock)Text("شراء: "+da(p.buyPrice)+" | بيع: "+da(p.sellPrice)+" | ربح الوحدة: "+da(p.sellPrice-p.buyPrice));if(isStock && p.stock<=p.minStock)Text("⚠ وصل للحد الأدنى: "+p.minStock,color=MaterialTheme.colorScheme.error)}
+      Column(Modifier.weight(1f)){Text(p.name,fontWeight=FontWeight.Bold,color=Color(0xFF26352D));Text(p.category+" • المخزون: "+p.stock,color=MaterialTheme.colorScheme.onSurfaceVariant);if(isStock)Text("شراء: "+da(p.buyPrice)+" | بيع: "+da(p.sellPrice)+" | ربح الوحدة: "+da(p.sellPrice-p.buyPrice));if(isStock && p.stock<=p.minStock)Text("⚠ وصل للحد الأدنى: "+p.minStock,color=MaterialTheme.colorScheme.error)}
       if(!isStock){Text(da(p.sellPrice),fontWeight=FontWeight.Bold);TextButton(onClick={val n=cart[p]?:0;if(p.stock>n)cart=cart+(p to n+1)else alert="المخزون غير كافٍ"}){Text("＋")}}
      }
     }
