@@ -175,8 +175,8 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
  val total=cart.entries.sumOf{(p,n)->p.sellPrice*n}
  fun da(v:Double)=String.format(Locale.US,"%.2f دج",v)
  Scaffold(containerColor=Color(0xFFF0F5F1),topBar={TopAppBar(colors=TopAppBarDefaults.topAppBarColors(containerColor=Color(0xFF174B3A),titleContentColor=Color.White,actionIconContentColor=Color.White),title={Text(if(isStock)"إدارة الستوك" else "Kachier DZ – البائع",fontWeight=FontWeight.Bold)},actions={
-  if(isStock) TextButton(onClick={editing=null;name="";buy="";price="";qty="0";category="متنوعة";barcode="";minStock="5";addOpen=true}){Text("+ سلعة")}
-  TextButton(onClick=logout){Text("خروج")}
+  if(isStock) TextButton(onClick={editing=null;name="";buy="";price="";qty="0";category="متنوعة";barcode="";minStock="5";addOpen=true}, colors=ButtonDefaults.textButtonColors(contentColor=Color.White)){Text("+ سلعة", color=Color.White)}
+  TextButton(onClick=logout, colors=ButtonDefaults.textButtonColors(contentColor=Color.White)){Text("خروج", color=Color.White)}
  })},bottomBar={if(!isStock) Surface(shadowElevation=6.dp){Column(Modifier.fillMaxWidth().padding(16.dp)){
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("المجموع",fontWeight=FontWeight.Bold);Text(da(total),fontWeight=FontWeight.Bold)}
   Spacer(Modifier.height(8.dp))
