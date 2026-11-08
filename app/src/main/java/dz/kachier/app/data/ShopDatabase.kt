@@ -1,4 +1,5 @@
 package dz.kachier.app.data
+// Schema v2 stores purchase cost per sold item for accurate gross-profit reporting.
 import android.content.Context
 import androidx.room.*
 
