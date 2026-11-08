@@ -62,9 +62,9 @@ class MainActivity : ComponentActivity() {
      secondaryContainer = Color(0xFFF4EBD8), onSecondaryContainer = Color(0xFF59431B),
      tertiary = Color(0xFF52647A), onTertiary = Color.White,
      tertiaryContainer = Color(0xFFE6EBF1), onTertiaryContainer = Color(0xFF26384D),
-     background = Color(0xFFF6F4EF), onBackground = Color(0xFF242820),
-     surface = Color(0xFFFFFEFA), onSurface = Color(0xFF242820),
-     surfaceVariant = Color(0xFFECE9E1), onSurfaceVariant = Color(0xFF5D625A),
+     background = Color(0xFFF0F5F1), onBackground = Color(0xFF202B25),
+     surface = Color(0xFFFFFFFF), onSurface = Color(0xFF202B25),
+     surfaceVariant = Color(0xFFE4EDE7), onSurfaceVariant = Color(0xFF526158),
      error = Color(0xFFB64040), errorContainer = Color(0xFFF8E4E1)
     )) {
     var profile by remember { mutableStateOf<Profile?>(null) }
@@ -174,7 +174,7 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
  LaunchedEffect(Unit){refresh()}
  val total=cart.entries.sumOf{(p,n)->p.sellPrice*n}
  fun da(v:Double)=String.format(Locale.US,"%.2f دج",v)
- Scaffold(topBar={TopAppBar(title={Text(if(isStock)"إدارة الستوك" else "Kachier DZ – البائع",fontWeight=FontWeight.Bold)},actions={
+ Scaffold(containerColor=Color(0xFFF0F5F1),topBar={TopAppBar(colors=TopAppBarDefaults.topAppBarColors(containerColor=Color(0xFF174B3A),titleContentColor=Color.White,actionIconContentColor=Color.White),title={Text(if(isStock)"إدارة الستوك" else "Kachier DZ – البائع",fontWeight=FontWeight.Bold)},actions={
   if(isStock) TextButton(onClick={editing=null;name="";buy="";price="";qty="0";category="متنوعة";barcode="";minStock="5";addOpen=true}){Text("+ سلعة")}
   TextButton(onClick=logout){Text("خروج")}
  })},bottomBar={if(!isStock) Surface(shadowElevation=6.dp){Column(Modifier.fillMaxWidth().padding(16.dp)){
