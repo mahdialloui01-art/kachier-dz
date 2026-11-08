@@ -134,6 +134,8 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
  var addOpen by remember { mutableStateOf(false) }; var name by remember { mutableStateOf("") }; var buy by remember { mutableStateOf("") }; var price by remember { mutableStateOf("") }; var qty by remember { mutableStateOf("0") }
  var alert by remember { mutableStateOf<String?>(null) }
  val isStock=profile==Profile.STOCK
+ var stockSection by remember { mutableStateOf("الرئيسية") }
+ var searchText by remember { mutableStateOf("") }
  fun refresh(){scope.launch{products=load();today=daily();todayProfit=profit()}}
  LaunchedEffect(Unit){refresh()}
  val total=cart.entries.sumOf{(p,n)->p.sellPrice*n}
@@ -147,19 +149,53 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
   Button(onClick={scope.launch{try{sale(cart);cart=emptyMap();alert="تم تسجيل البيع بنجاح";refresh()}catch(e:Exception){alert=e.message?:"تعذر تسجيل البيع"}}},enabled=cart.isNotEmpty(),modifier=Modifier.fillMaxWidth()){Text("إتمام البيع")}
  }}}){pad->
   Column(Modifier.fillMaxSize().padding(pad).padding(horizontal=16.dp)){
-   if(isStock) Card(Modifier.fillMaxWidth().padding(top=10.dp)){Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
-    Text("ملخص الحسابات",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-    Text("مبيعات اليوم: "+da(today));Text("الربح الإجمالي المحقق اليوم: "+da(todayProfit))
-    Text("قيمة المخزون بسعر الشراء: "+da(products.sumOf{it.buyPrice*it.stock}))
-    Text("القيمة المتوقعة عند بيع المخزون: "+da(products.sumOf{it.sellPrice*it.stock}))
-    Text("الربح المتوقع من المخزون: "+da(products.sumOf{(it.sellPrice-it.buyPrice)*it.stock}))
-    Text("عدد الوحدات: "+products.sumOf{it.stock})
-   }} else Card(Modifier.fillMaxWidth().padding(top=10.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){
+   if(isStock) {
+    Row(Modifier.fillMaxWidth().padding(top=10.dp,bottom=8.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+     listOf("الرئيسية","المنتجات","التنبيهات","التقارير").forEach { section ->
+      FilterChip(selected=stockSection==section,onClick={stockSection=section},label={Text(section)})
+     }
+    }
+    when(stockSection) {
+     "الرئيسية" -> Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+      Text("لوحة قيادة الستوك",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+      Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+       Card(Modifier.weight(1f),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){Column(Modifier.padding(12.dp)){Text("قيمة الشراء",style=MaterialTheme.typography.labelMedium);Text(da(products.sumOf{it.buyPrice*it.stock}),fontWeight=FontWeight.Bold);Text("المخزون الحالي",style=MaterialTheme.typography.labelSmall)}}
+       Card(Modifier.weight(1f)){Column(Modifier.padding(12.dp)){Text("قيمة البيع المتوقعة",style=MaterialTheme.typography.labelMedium);Text(da(products.sumOf{it.sellPrice*it.stock}),fontWeight=FontWeight.Bold);Text("ليست ربحاً محققاً",style=MaterialTheme.typography.labelSmall)}}
+      }
+      Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+       Card(Modifier.weight(1f)){Column(Modifier.padding(12.dp)){Text("ربح اليوم",style=MaterialTheme.typography.labelMedium);Text(da(todayProfit),fontWeight=FontWeight.Bold);Text("محقق من المبيعات",style=MaterialTheme.typography.labelSmall)}}
+       Card(Modifier.weight(1f)){Column(Modifier.padding(12.dp)){Text("مبيعات اليوم",style=MaterialTheme.typography.labelMedium);Text(da(today),fontWeight=FontWeight.Bold);Text(products.size.toString()+" صنف",style=MaterialTheme.typography.labelSmall)}}
+      }
+      val lowCount=products.count{it.stock<=5}
+      Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=if(lowCount>0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer)){
+       Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
+        Column(Modifier.weight(1f)){Text(if(lowCount>0)"تنبيه المخزون" else "المخزون بحالة جيدة",fontWeight=FontWeight.Bold);Text(if(lowCount>0)"$lowCount سلعة وصلت للحد الأدنى (5 وحدات أو أقل)" else "لا توجد سلع منخفضة حالياً",style=MaterialTheme.typography.bodySmall)}
+        TextButton(onClick={stockSection="التنبيهات"}){Text("عرض")}
+       }
+      }
+      Text("الربح المتوقع من المخزون: "+da(products.sumOf{(it.sellPrice-it.buyPrice)*it.stock}),style=MaterialTheme.typography.bodyMedium)
+     }
+     "المنتجات" -> OutlinedTextField(searchText,{searchText=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("ابحث عن سلعة")})
+     "التنبيهات" -> {
+      val low=products.filter{it.stock<=5}
+      Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.errorContainer)){Column(Modifier.padding(12.dp)){Text("السلع الناقصة",fontWeight=FontWeight.Bold);Text("الحد الأدنى الحالي: 5 وحدات")}}
+      low.forEach { p -> ListItem(headlineContent={Text(p.name)},supportingContent={Text("المتبقي: ${p.stock} | سعر البيع: ${da(p.sellPrice)}")},leadingContent={Text("⚠")}) }
+     }
+     "التقارير" -> Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+      Text("ملخص الأداء اليومي",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+      Card { Column(Modifier.padding(14.dp)){Text("إجمالي المبيعات اليوم");Text(da(today),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)} }
+      Card { Column(Modifier.padding(14.dp)){Text("الربح الإجمالي المحقق اليوم");Text(da(todayProfit),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)} }
+      Card { Column(Modifier.padding(14.dp)){Text("قيمة المخزون بسعر الشراء");Text(da(products.sumOf{it.buyPrice*it.stock}),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)} }
+      Text("التقارير التاريخية والمقارنة الشهرية ستضاف بعد بناء سجل المشتريات والمصاريف.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+     }
+    }
+   } else Card(Modifier.fillMaxWidth().padding(top=10.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)){
     Column(Modifier.padding(16.dp)){Text("مبيعات اليوم");Text(da(today),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)}
    }
-   Row(Modifier.fillMaxWidth().padding(vertical=12.dp),horizontalArrangement=Arrangement.SpaceBetween){Text(if(isStock)"المنتجات والمخزون" else "السلع للبيع",style=MaterialTheme.typography.titleLarge);Text(products.size.toString()+" منتج")}
-   if(products.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(),contentAlignment=Alignment.Center){Text(if(isStock)"أضف أول سلعة من الأعلى" else "لا توجد سلع بعد. اطلب من مسؤول الستوك إضافتها.")}
-   else LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)){items(products,key={it.id}){p->
+   if(!isStock || stockSection=="الرئيسية" || stockSection=="المنتجات") Row(Modifier.fillMaxWidth().padding(vertical=12.dp),horizontalArrangement=Arrangement.SpaceBetween){Text(if(isStock)"المنتجات والمخزون" else "السلع للبيع",style=MaterialTheme.typography.titleLarge);Text(products.size.toString()+" منتج")}
+   val shownProducts=if(isStock && stockSection=="التنبيهات") emptyList() else if(isStock && stockSection=="التقارير") emptyList() else if(isStock && stockSection=="المنتجات" && searchText.isNotBlank()) products.filter{it.name.contains(searchText.trim(),ignoreCase=true)} else products
+   if(shownProducts.isEmpty() && (stockSection=="الرئيسية" || stockSection=="المنتجات" || !isStock)) Box(Modifier.weight(1f).fillMaxWidth(),contentAlignment=Alignment.Center){Text(if(isStock)"لا توجد سلع مطابقة. أضف سلعة من الأعلى." else "لا توجد سلع بعد. اطلب من مسؤول الستوك إضافتها.")}
+   else if(shownProducts.isNotEmpty()) LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)){items(shownProducts,key={it.id}){p->
     Card(Modifier.fillMaxWidth().then(if(!isStock)Modifier.clickable{val n=cart[p]?:0;if(p.stock>n)cart=cart+(p to n+1)else alert="المخزون غير كافٍ"}else Modifier)){
      Row(Modifier.fillMaxWidth().padding(14.dp),verticalAlignment=Alignment.CenterVertically){
       Column(Modifier.weight(1f)){Text(p.name,fontWeight=FontWeight.SemiBold);Text("المخزون: "+p.stock);if(isStock)Text("شراء: "+da(p.buyPrice)+" | بيع: "+da(p.sellPrice)+" | ربح الوحدة: "+da(p.sellPrice-p.buyPrice))}
