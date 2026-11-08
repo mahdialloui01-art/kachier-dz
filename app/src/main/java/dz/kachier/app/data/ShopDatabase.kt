@@ -7,7 +7,7 @@ data class Product(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: 
 @Entity(tableName = "sales")
 data class Sale(@PrimaryKey(autoGenerate = true) val id: Long = 0, val total: Double, val createdAt: Long = System.currentTimeMillis())
 @Entity(tableName = "sale_items")
-data class SaleItem(@PrimaryKey(autoGenerate = true) val id: Long = 0, val saleId: Long, val productId: Long, val productName: String, val quantity: Int, val unitPrice: Double)
+data class SaleItem(@PrimaryKey(autoGenerate = true) val id: Long = 0, val saleId: Long, val productId: Long, val productName: String, val quantity: Int, val unitPrice: Double, val unitBuyPrice: Double = 0.0)
 @Dao
 interface ShopDao {
  @Query("SELECT * FROM products ORDER BY name COLLATE NOCASE") suspend fun getProducts(): List<Product>
@@ -16,14 +16,18 @@ interface ShopDao {
  @Insert suspend fun addSale(sale: Sale): Long
  @Insert suspend fun addItems(items: List<SaleItem>)
  @Query("SELECT COALESCE(SUM(total),0) FROM sales WHERE createdAt >= :start") suspend fun totalSince(start: Long): Double
+ @Query("SELECT COALESCE(SUM((unitPrice-unitBuyPrice)*quantity),0) FROM sale_items INNER JOIN sales ON sale_items.saleId=sales.id WHERE sales.createdAt >= :start") suspend fun profitSince(start: Long): Double
 }
-@Database(entities = [Product::class, Sale::class, SaleItem::class], version = 1, exportSchema = false)
+@Database(entities = [Product::class, Sale::class, SaleItem::class], version = 2, exportSchema = false)
 abstract class ShopDatabase : RoomDatabase() {
  abstract fun dao(): ShopDao
  companion object {
   @Volatile private var instance: ShopDatabase? = null
+  private val MIGRATION_1_2 = object : Migration(1,2) {
+   override fun migrate(db: SupportSQLiteDatabase) { db.execSQL("ALTER TABLE sale_items ADD COLUMN unitBuyPrice REAL NOT NULL DEFAULT 0.0") }
+  }
   fun get(context: Context): ShopDatabase = instance ?: synchronized(this) {
-   instance ?: Room.databaseBuilder(context.applicationContext, ShopDatabase::class.java, "kachier-dz.db").build().also { instance = it }
+   instance ?: Room.databaseBuilder(context.applicationContext, ShopDatabase::class.java, "kachier-dz.db").addMigrations(MIGRATION_1_2).build().also { instance = it }
   }
  }
 }
