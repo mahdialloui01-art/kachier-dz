@@ -2,6 +2,8 @@ package dz.kachier.app.data
 // Schema v2 stores purchase cost per sold item for accurate gross-profit reporting.
 import android.content.Context
 import androidx.room.*
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Entity(tableName = "products")
 data class Product(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String, val buyPrice: Double = 0.0, val sellPrice: Double, val stock: Int = 0)
