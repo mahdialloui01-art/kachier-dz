@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
      profile = profile!!,
      load = { dao.getProducts() },
      add = { dao.addProduct(it) },
+     update = { dao.updateProduct(it) }, remove = { dao.deleteProduct(it) },
      sale = { cart -> db.withTransaction {
       val current = dao.getProducts().associateBy { it.id }
       require(cart.all { (p,n) -> n > 0 && (current[p.id]?.stock ?: -1) >= n }) { "المخزون غير كافٍ، حدّث القائمة وحاول مجدداً" }
@@ -127,11 +128,11 @@ private fun ProfileLogin(verify:(Profile,String)->Boolean,onLogin:(Profile)->Uni
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Product)->Long,sale:suspend(Map<Product,Int>)->Unit,daily:suspend()->Double,profit:suspend()->Double,logout:()->Unit) {
+private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Product)->Long,update:suspend(Product)->Unit,remove:suspend(Product)->Unit,sale:suspend(Map<Product,Int>)->Unit,daily:suspend()->Double,profit:suspend()->Double,logout:()->Unit) {
  val scope= rememberCoroutineScope()
  var products by remember { mutableStateOf<List<Product>>(emptyList()) }; var cart by remember { mutableStateOf<Map<Product,Int>>(emptyMap()) }
  var today by remember { mutableDoubleStateOf(0.0) }; var todayProfit by remember { mutableDoubleStateOf(0.0) }
- var addOpen by remember { mutableStateOf(false) }; var name by remember { mutableStateOf("") }; var buy by remember { mutableStateOf("") }; var price by remember { mutableStateOf("") }; var qty by remember { mutableStateOf("0") }
+ var addOpen by remember { mutableStateOf(false) }; var editing by remember { mutableStateOf<Product?>(null) }; var deleting by remember { mutableStateOf<Product?>(null) }; var name by remember { mutableStateOf("") }; var buy by remember { mutableStateOf("") }; var price by remember { mutableStateOf("") }; var qty by remember { mutableStateOf("0") }; var category by remember { mutableStateOf("متنوعة") }; var barcode by remember { mutableStateOf("") }; var minStock by remember { mutableStateOf("5") }
  var alert by remember { mutableStateOf<String?>(null) }
  val isStock=profile==Profile.STOCK
  var stockSection by remember { mutableStateOf("الرئيسية") }
@@ -141,7 +142,7 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
  val total=cart.entries.sumOf{(p,n)->p.sellPrice*n}
  fun da(v:Double)=String.format(Locale.US,"%.2f دج",v)
  Scaffold(topBar={TopAppBar(title={Text(if(isStock)"إدارة الستوك" else "Kachier DZ – البائع",fontWeight=FontWeight.Bold)},actions={
-  if(isStock) TextButton(onClick={addOpen=true}){Text("+ سلعة")}
+  if(isStock) TextButton(onClick={editing=null;name="";buy="";price="";qty="0";category="متنوعة";barcode="";minStock="5";addOpen=true}){Text("+ سلعة")}
   TextButton(onClick=logout){Text("خروج")}
  })},bottomBar={if(!isStock) Surface(shadowElevation=6.dp){Column(Modifier.fillMaxWidth().padding(16.dp)){
   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text("المجموع",fontWeight=FontWeight.Bold);Text(da(total),fontWeight=FontWeight.Bold)}
@@ -166,7 +167,7 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
        Card(Modifier.weight(1f)){Column(Modifier.padding(12.dp)){Text("ربح اليوم",style=MaterialTheme.typography.labelMedium);Text(da(todayProfit),fontWeight=FontWeight.Bold);Text("محقق من المبيعات",style=MaterialTheme.typography.labelSmall)}}
        Card(Modifier.weight(1f)){Column(Modifier.padding(12.dp)){Text("مبيعات اليوم",style=MaterialTheme.typography.labelMedium);Text(da(today),fontWeight=FontWeight.Bold);Text(products.size.toString()+" صنف",style=MaterialTheme.typography.labelSmall)}}
       }
-      val lowCount=products.count{it.stock<=5}
+      val lowCount=products.count{it.stock<=it.minStock}
       Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=if(lowCount>0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer)){
        Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
         Column(Modifier.weight(1f)){Text(if(lowCount>0)"تنبيه المخزون" else "المخزون بحالة جيدة",fontWeight=FontWeight.Bold);Text(if(lowCount>0)"$lowCount سلعة وصلت للحد الأدنى (5 وحدات أو أقل)" else "لا توجد سلع منخفضة حالياً",style=MaterialTheme.typography.bodySmall)}
@@ -177,8 +178,8 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
      }
      "المنتجات" -> OutlinedTextField(searchText,{searchText=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("ابحث عن سلعة")})
      "التنبيهات" -> {
-      val low=products.filter{it.stock<=5}
-      Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.errorContainer)){Column(Modifier.padding(12.dp)){Text("السلع الناقصة",fontWeight=FontWeight.Bold);Text("الحد الأدنى الحالي: 5 وحدات")}}
+      val low=products.filter{it.stock<=it.minStock}
+      Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.errorContainer)){Column(Modifier.padding(12.dp)){Text("السلع الناقصة",fontWeight=FontWeight.Bold);Text("يُحسب التنبيه حسب الحد الأدنى المحدد لكل سلعة")}}
       low.forEach { p -> ListItem(headlineContent={Text(p.name)},supportingContent={Text("المتبقي: ${p.stock} | سعر البيع: ${da(p.sellPrice)}")},leadingContent={Text("⚠")}) }
      }
      "التقارير" -> Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -193,12 +194,12 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
     Column(Modifier.padding(16.dp)){Text("مبيعات اليوم");Text(da(today),style=MaterialTheme.typography.headlineMedium,fontWeight=FontWeight.Bold)}
    }
    if(!isStock || stockSection=="الرئيسية" || stockSection=="المنتجات") Row(Modifier.fillMaxWidth().padding(vertical=12.dp),horizontalArrangement=Arrangement.SpaceBetween){Text(if(isStock)"المنتجات والمخزون" else "السلع للبيع",style=MaterialTheme.typography.titleLarge);Text(products.size.toString()+" منتج")}
-   val shownProducts=if(isStock && stockSection=="التنبيهات") emptyList() else if(isStock && stockSection=="التقارير") emptyList() else if(isStock && stockSection=="المنتجات" && searchText.isNotBlank()) products.filter{it.name.contains(searchText.trim(),ignoreCase=true)} else products
+   val shownProducts=if(isStock && stockSection=="التنبيهات") emptyList() else if(isStock && stockSection=="التقارير") emptyList() else if(isStock && stockSection=="المنتجات" && searchText.isNotBlank()) products.filter{it.name.contains(searchText.trim(),ignoreCase=true) || it.category.contains(searchText.trim(),ignoreCase=true) || (it.barcode?.contains(searchText.trim())==true)} else products
    if(shownProducts.isEmpty() && (stockSection=="الرئيسية" || stockSection=="المنتجات" || !isStock)) Box(Modifier.weight(1f).fillMaxWidth(),contentAlignment=Alignment.Center){Text(if(isStock)"لا توجد سلع مطابقة. أضف سلعة من الأعلى." else "لا توجد سلع بعد. اطلب من مسؤول الستوك إضافتها.")}
    else if(shownProducts.isNotEmpty()) LazyColumn(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(8.dp)){items(shownProducts,key={it.id}){p->
-    Card(Modifier.fillMaxWidth().then(if(!isStock)Modifier.clickable{val n=cart[p]?:0;if(p.stock>n)cart=cart+(p to n+1)else alert="المخزون غير كافٍ"}else Modifier)){
+    Card(Modifier.fillMaxWidth().then(if(!isStock)Modifier.clickable{val n=cart[p]?:0;if(p.stock>n)cart=cart+(p to n+1)else alert="المخزون غير كافٍ"}else Modifier.clickable{editing=p;name=p.name;buy=p.buyPrice.toString();price=p.sellPrice.toString();qty=p.stock.toString();category=p.category;barcode=p.barcode.orEmpty();minStock=p.minStock.toString();addOpen=true})){
      Row(Modifier.fillMaxWidth().padding(14.dp),verticalAlignment=Alignment.CenterVertically){
-      Column(Modifier.weight(1f)){Text(p.name,fontWeight=FontWeight.SemiBold);Text("المخزون: "+p.stock);if(isStock)Text("شراء: "+da(p.buyPrice)+" | بيع: "+da(p.sellPrice)+" | ربح الوحدة: "+da(p.sellPrice-p.buyPrice))}
+      Column(Modifier.weight(1f)){Text(p.name,fontWeight=FontWeight.SemiBold);Text(p.category+" • المخزون: "+p.stock);if(isStock)Text("شراء: "+da(p.buyPrice)+" | بيع: "+da(p.sellPrice)+" | ربح الوحدة: "+da(p.sellPrice-p.buyPrice));if(isStock && p.stock<=p.minStock)Text("⚠ وصل للحد الأدنى: "+p.minStock,color=MaterialTheme.colorScheme.error)}
       if(!isStock){Text(da(p.sellPrice),fontWeight=FontWeight.Bold);TextButton(onClick={val n=cart[p]?:0;if(p.stock>n)cart=cart+(p to n+1)else alert="المخزون غير كافٍ"}){Text("＋")}}
      }
     }
@@ -206,13 +207,18 @@ private fun Cashier(profile:Profile,load:suspend()->List<Product>,add:suspend(Pr
    if(!isStock&&cart.isNotEmpty())Text("السلة: "+cart.entries.joinToString("، "){"\${it.key.name} × \${it.value}"})
   }
  }
- if(addOpen) AlertDialog(onDismissRequest={addOpen=false},title={Text("إضافة سلعة")},text={Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
+ if(addOpen) AlertDialog(onDismissRequest={addOpen=false},title={Text(if(editing==null)"إضافة سلعة" else "تعديل السلعة")},text={Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
   OutlinedTextField(name,{name=it},label={Text("اسم السلعة")},singleLine=true)
+  var expanded by remember { mutableStateOf(false) }
+  Box { OutlinedButton(onClick={expanded=true},modifier=Modifier.fillMaxWidth()){Text("الصنف: $category")}; DropdownMenu(expanded=expanded,onDismissRequest={expanded=false}) { listOf("سجائر وتبغ","شوكولا وحلويات","علكة وبونبون","مشروبات ومياه","شيبس ومقرمشات","بسكويت وكيك","قهوة وشاي","مواد غذائية","مواد تنظيف","نظافة شخصية","لوازم الهاتف","بطاريات وولاعات","مثلجات","متنوعة").forEach { c -> DropdownMenuItem(text={Text(c)},onClick={category=c;expanded=false}) } } }
   OutlinedTextField(buy,{buy=it},label={Text("سعر الشراء")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true)
   OutlinedTextField(price,{price=it},label={Text("سعر البيع")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true)
-  OutlinedTextField(qty,{qty=it},label={Text("الكمية")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true)
- }},confirmButton={TextButton(onClick={val b=buy.toDoubleOrNull();val p=price.toDoubleOrNull();val n=qty.toIntOrNull()
-  if(name.isNotBlank()&&b!=null&&b>=0&&p!=null&&p>=0&&n!=null&&n>=0)scope.launch{add(Product(name=name.trim(),buyPrice=b,sellPrice=p,stock=n));name="";buy="";price="";qty="0";addOpen=false;refresh()}else alert="تأكد من الاسم وسعر الشراء والبيع والكمية"
- }){Text("حفظ")}},dismissButton={TextButton(onClick={addOpen=false}){Text("إلغاء")}})
+  OutlinedTextField(qty,{qty=it},label={Text("الكمية الحالية")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true)
+  OutlinedTextField(minStock,{minStock=it},label={Text("حد التنبيه الأدنى")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true)
+  OutlinedTextField(barcode,{barcode=it},label={Text("الباركود (اختياري)")},singleLine=true)
+ }},confirmButton={TextButton(onClick={val b=buy.toDoubleOrNull();val p=price.toDoubleOrNull();val n=qty.toIntOrNull();val min=minStock.toIntOrNull()
+  if(name.isNotBlank()&&b!=null&&b>=0&&p!=null&&p>=0&&n!=null&&n>=0&&min!=null&&min>=0)scope.launch{val old=editing;val item=Product(id=old?.id?:0,name=name.trim(),buyPrice=b,sellPrice=p,stock=n,category=category,barcode=barcode.trim().ifBlank{null},minStock=min);if(old==null)add(item)else update(item);editing=null;name="";buy="";price="";qty="0";category="متنوعة";barcode="";minStock="5";addOpen=false;refresh()}else alert="تأكد من الاسم والأسعار والكمية وحد التنبيه"
+ }){Text(if(editing==null)"حفظ" else "حفظ التعديلات")}},dismissButton={Row { if(editing!=null) TextButton(onClick={deleting=editing;addOpen=false}){Text("حذف",color=MaterialTheme.colorScheme.error)}; TextButton(onClick={addOpen=false}){Text("إلغاء")} }})
+ if(deleting!=null) AlertDialog(onDismissRequest={deleting=null},title={Text("تأكيد حذف السلعة")},text={Text("هل تريد حذف "+(deleting?.name?:"")+"؟ لن تُحذف فواتيرها السابقة.")},confirmButton={TextButton(onClick={scope.launch{deleting?.let{remove(it)};deleting=null;refresh()}}){Text("حذف")}},dismissButton={TextButton(onClick={deleting=null}){Text("إلغاء")}})
  alert?.let{msg->AlertDialog(onDismissRequest={alert=null},confirmButton={TextButton(onClick={alert=null}){Text("حسناً")}},text={Text(msg)})}
 }
